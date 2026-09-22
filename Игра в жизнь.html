@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Солвер: Простая игра Жизнь (6x8)</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        h2 {
+            margin-bottom: 10px;
+            color: #222;
+        }
+        p {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+            max-width: 400px;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .grid {
+            display: grid;
+            /* 6 колонок в ширину по 50px */
+            grid-template-columns: repeat(6, 50px);
+            /* 8 строк в высоту по 50px */
+            grid-template-rows: repeat(8, 50px);
+            gap: 4px;
+            background-color: #ccc;
+            padding: 4px;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            background-color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.1s ease;
+        }
+        .cell.white {
+            background-color: #fff;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button.btn {
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button.btn:hover {
+            opacity: 0.9;
+        }
+        .btn-calc {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-clear {
+            background-color: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Простая игра "Жизнь" (6x8)</h2>
+    <p>Сетка: 6 в ширину, 8 в высоту. Выставьте начальное состояние модуля, затем нажмите «Рассчитать».</p>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="controls">
+        <button class="btn btn-calc" onclick="nextGeneration()">Рассчитать (1 шаг)</button>
+        <button class="btn btn-clear" onclick="resetGrid()">Очистить все</button>
+    </div>
+
+    <script>
+        const COLS = 6; // Ширина
+        const ROWS = 8; // Высота
+        
+        // Инициализация пустого состояния (false = черный, true = белый)
+        let gridState = Array(ROWS).fill(null).map(() => Array(COLS).fill(false));
+        const gridElement = document.getElementById('grid');
+
+        // Создание сетки на экране
+        function createGrid() {
+            gridElement.innerHTML = '';
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement('button');
+                    cell.className = 'cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.addEventListener('click', () => toggleCell(r, c, cell));
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+
+        // Переключение цвета клетки при клике
+        function toggleCell(r, c, element) {
+            gridState[r][c] = !gridState[r][c];
+            element.classList.toggle('white', gridState[r][c]);
+        }
+
+        // Синхронизация визуального отображения с массивом данных
+        function updateDisplay() {
+            const cells = gridElement.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const r = parseInt(cell.dataset.row);
+                const c = parseInt(cell.dataset.col);
+                cell.classList.toggle('white', gridState[r][c]);
+            });
+        }
+
+        // Подсчет количества белых (живых) соседей вокруг клетки (r, c)
+        function countWhiteNeighbors(r, c) {
+            let count = 0;
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    if (i === 0 && j === 0) continue; // Пропускаем саму клетку
+                    const nr = r + i;
+                    const nc = c + j;
+                    // Проверка границ сетки 6x8
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                        if (gridState[nr][nc]) count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        // Расчет следующего шага
+        function nextGeneration() {
+            let nextState = Array(ROWS).fill(null).map(() => Array(COLS).fill(false));
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const whiteNeighbors = countWhiteNeighbors(r, c);
+                    const isWhite = gridState[r][c];
+
+                    if (!isWhite) {
+                        // Правило для Черного квадрата: становится белым только при ровно 3 белых соседях
+                        if (whiteNeighbors === 3) {
+                            nextState[r][c] = true;
+                        } else {
+                            nextState[r][c] = false;
+                        }
+                    } else {
+                        // Правило для Белого квадрата: остается белым только при 2 или 3 белых соседях
+                        if (whiteNeighbors === 2 || whiteNeighbors === 3) {
+                            nextState[r][c] = true;
+                        } else {
+                            nextState[r][c] = false;
+                        }
+                    }
+                }
+            }
+
+            gridState = nextState;
+            updateDisplay();
+        }
+
+        // Полный сброс поля в черное состояние
+        function resetGrid() {
+            gridState = Array(ROWS).fill(null).map(() => Array(COLS).fill(false));
+            updateDisplay();
+        }
+
+        // Запуск генератора сетки при загрузке страницы
+        createGrid();
+    </script>
+
+</body>
+</html>

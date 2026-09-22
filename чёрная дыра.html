@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Калькулятор Чёрных Дыр — N шагов</title>
+    <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=yBKs6NHadGpY_M_dpY2dN7vQmWPNnaKS4irWM8F-kb9pGrSSwUYoAelyPTd8KFKbHMD4UDB4885k3Yq4LdopnxJgQIyUVsM7NOz5exQsxm6nuhXxNzQHymJqSNGDBpEhYDNrDLOtVGNfWKVQmh9KUSWfinSz5NhK5rTBb85kfG-u4C5l2RbDHhe_JEwHxhwAZDuCPNp-Lzu6cpuUYcdBBlmzhbU72-I7Bi7FOxy9HvRgmtpNlMEi1MYTfOWCQPNPHbV0_SKx4lSXf5sU8Pqmd9Hf-SKf_TkoHxV4b_FXnFEFDtpm5E3-f3PjnWxDP7D-kSKMI0h3I2EAxCKlziRQNQ" charset="UTF-8"></script><style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .container {
+            max-width: 760px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #222;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-left: 5px solid #007bff;
+            border-radius: 4px;
+        }
+        .code-output {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            letter-spacing: 5px;
+            text-align: center;
+            margin: 10px 0;
+        }
+        ol {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+        .hint {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Модуль «О Чёрных дырах»</h2>
+    
+    <div class="form-group">
+        <label for="coordX">Координата X (Столбец 0-9):</label>
+        <input type="number" id="coordX" min="0" max="9" value="9">
+    </div>
+    
+    <div class="form-group">
+        <label for="coordY">Координата Y (Строка 0-9):</label>
+        <input type="number" id="coordY" min="0" max="9" value="4">
+    </div>
+    
+    <div class="form-group">
+        <label for="ports">Количество портов на бомбе:</label>
+        <input type="number" id="ports" min="0" max="999" value="4">
+        <div class="hint">Начальное направление: север + 45° за каждый порт.</div>
+    </div>
+
+    <div class="form-group">
+        <label for="stepsCount">Количество шагов / цифр N:</label>
+        <input type="number" id="stepsCount" min="1" max="500" value="7">
+        <div class="hint">Для обычной Чёрной дыры из инструкции N = 7. Можно ввести любое N.</div>
+    </div>
+    
+    <button onclick="calculateCode()">Рассчитать N шагов</button>
+    
+    <div id="resultBlock" class="result" style="display:none;">
+        <h3>Результат:</h3>
+        <div class="code-output" id="finalCode"></div>
+        <hr>
+        <h4>Пошаговый лог пути:</h4>
+        <ol id="logList"></ol>
+    </div>
+</div>
+
+<script>
+// Таблица 10x10 из инструкции
+const grid = [
+    [3, 4, 1, 0, 2, 3, 1, 2, 0, 4],
+    [1, 3, 0, 2, 4, 1, 2, 3, 4, 0],
+    [3, 2, 4, 2, 1, 3, 0, 0, 1, 4],
+    [4, 0, 0, 1, 3, 4, 2, 2, 1, 3],
+    [1, 2, 1, 3, 0, 0, 4, 3, 4, 2],
+    [4, 0, 2, 3, 4, 1, 3, 0, 2, 1],
+    [2, 1, 3, 1, 3, 0, 4, 4, 0, 2],
+    [2, 4, 4, 0, 0, 2, 1, 1, 3, 3],
+    [0, 1, 3, 4, 2, 2, 0, 4, 3, 1],
+    [0, 3, 2, 4, 1, 4, 3, 1, 2, 0]
+];
+
+// Векторы направлений (0 = Север, и далее по часовой стрелке каждые 45 градусов)
+const directions = [
+    { dx:  0, dy: -1, name: "Север" },
+    { dx:  1, dy: -1, name: "Северо-Восток" },
+    { dx:  1, dy:  0, name: "Восток" },
+    { dx:  1, dy:  1, name: "Юго-Восток" },
+    { dx:  0, dy:  1, name: "Юг" },
+    { dx: -1, dy:  1, name: "Юго-Запад" },
+    { dx: -1, dy:  0, name: "Запад" },
+    { dx: -1, dy: -1, name: "Северо-Запад" }
+];
+
+// Функция корректного взятия остатка (работает с отрицательными числами)
+function mod(n, m) {
+    return ((n % m) + m) % m;
+}
+
+function calculateCode() {
+    let x = parseInt(document.getElementById('coordX').value, 10);
+    let y = parseInt(document.getElementById('coordY').value, 10);
+    const ports = parseInt(document.getElementById('ports').value, 10);
+    const stepsCount = parseInt(document.getElementById('stepsCount').value, 10);
+    
+    if (isNaN(x) || x < 0 || x > 9 || isNaN(y) || y < 0 || y > 9) {
+        alert("Координаты должны быть в диапазоне от 0 до 9");
+        return;
+    }
+
+    if (isNaN(ports) || ports < 0) {
+        alert("Количество портов должно быть числом от 0 и выше");
+        return;
+    }
+
+    if (isNaN(stepsCount) || stepsCount < 1 || stepsCount > 500) {
+        alert("N должно быть числом от 1 до 500");
+        return;
+    }
+    
+    // Начальное направление: Север = 0, +45 градусов за каждый порт.
+    let dirIndex = mod(ports, 8);
+    
+    let code = [];
+    let logs = [];
+    
+    // Шаг 1: первая цифра — значение в начальной клетке.
+    let val1 = grid[y][x];
+    code.push(val1);
+    logs.push(`Шаг 1: начальная точка (${x}, ${y}), значение <b>${val1}</b>. Направление перед ходом: ${directions[dirIndex].name}.`);
+    
+    // После получения первой цифры: пройти 1 клетку по направлению и повернуть на 45° по часовой стрелке.
+    x = mod(x + directions[dirIndex].dx, 10);
+    y = mod(y + directions[dirIndex].dy, 10);
+    dirIndex = mod(dirIndex + 1, 8);
+    
+    // Шаги со 2 по N: n-я цифра = сумма n последовательных клеток по текущему направлению mod 5.
+    for (let n = 2; n <= stepsCount; n++) {
+        let sum = 0;
+        let cx = x;
+        let cy = y;
+        let cellsVisited = [];
+        let coordsVisited = [];
+        
+        for (let step = 0; step < n; step++) {
+            let val = grid[cy][cx];
+            sum += val;
+            cellsVisited.push(val);
+            coordsVisited.push(`(${cx},${cy})`);
+            
+            // Переходим к следующей клетке в цепочке суммирования.
+            if (step < n - 1) {
+                cx = mod(cx + directions[dirIndex].dx, 10);
+                cy = mod(cy + directions[dirIndex].dy, 10);
+            }
+        }
+        
+        let digit = sum % 5;
+        code.push(digit);
+        logs.push(`Шаг ${n}: направление ${directions[dirIndex].name}; клетки ${coordsVisited.join(' → ')}; значения [${cellsVisited.join('+')}] = ${sum}; цифра <b>${digit}</b> (mod 5).`);
+        
+        // После получения цифры: пройти на 1 клетку дальше последней использованной клетки и повернуть на 45°.
+        x = mod(cx + directions[dirIndex].dx, 10);
+        y = mod(cy + directions[dirIndex].dy, 10);
+        dirIndex = mod(dirIndex + 1, 8);
+    }
+    
+    document.getElementById('finalCode').innerText = code.join(' ');
+    
+    const logList = document.getElementById('logList');
+    logList.innerHTML = '';
+    logs.forEach(log => {
+        let li = document.createElement('li');
+        li.innerHTML = log;
+        logList.appendChild(li);
+    });
+    
+    document.getElementById('resultBlock').style.display = 'block';
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>KTaNE — Chess Solver</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: Arial, sans-serif;
+            background: #181818;
+            color: #eeeeee;
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        .container {
+            display: flex;
+            gap: 50px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        /* -------------------------
+           Левая панель
+        ------------------------- */
+
+        .panel {
+            width: 370px;
+            max-width: 100%;
+            background: #252525;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .serial-block {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #cccccc;
+        }
+
+        input {
+            width: 100%;
+            padding: 9px 10px;
+            border-radius: 6px;
+            border: 1px solid #555;
+            background: #151515;
+            color: white;
+            font-size: 16px;
+        }
+
+        input:focus {
+            outline: 2px solid #777;
+        }
+
+        .coordinates {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .coord-row {
+            display: flex;
+            flex-direction: column;
+        }
+
+        button {
+            margin-top: 20px;
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 7px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #solveButton {
+            background: #eeeeee;
+            color: #111;
+        }
+
+        #solveButton:hover {
+            background: #d8d8d8;
+        }
+
+        .error {
+            margin-top: 15px;
+            color: #ff7474;
+            min-height: 20px;
+        }
+
+        /* -------------------------
+           Результат
+        ------------------------- */
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #171717;
+            display: none;
+        }
+
+        .answer {
+            margin-top: 10px;
+            font-size: 30px;
+            font-weight: bold;
+        }
+
+        .pieces-list {
+            margin-top: 15px;
+            line-height: 1.8;
+        }
+
+        /* -------------------------
+           Доска
+        ------------------------- */
+
+        .board-area {
+            overflow-x: auto;
+            max-width: 100%;
+        }
+
+        .board-wrapper {
+            display: grid;
+            grid-template-columns: 35px repeat(6, 70px);
+            grid-template-rows: repeat(6, 70px) 35px;
+            user-select: none;
+            width: max-content;
+        }
+
+        .board {
+            grid-column: 2 / 8;
+            grid-row: 1 / 7;
+            display: grid;
+            grid-template-columns: repeat(6, 70px);
+            grid-template-rows: repeat(6, 70px);
+            border: 5px solid #777;
+        }
+
+        .cell {
+            width: 70px;
+            height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            font-size: 46px;
+            transition: 0.15s;
+        }
+
+        .white {
+            background: #eeeeee;
+            color: #111111;
+        }
+
+        .black {
+            background: #333333;
+            color: #ffffff;
+        }
+
+        /* Клетка покрывается хотя бы одной фигурой. */
+        .attacked::after {
+            content: "";
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background: rgba(220, 70, 70, 0.7);
+            border-radius: 50%;
+            bottom: 5px;
+            right: 5px;
+        }
+
+        /* Единственная непокрытая клетка. */
+        .safe {
+            outline: 6px solid #34c759;
+            outline-offset: -6px;
+        }
+
+        .safe::after {
+            background: #34c759;
+        }
+
+        .piece-number {
+            position: absolute;
+            top: 3px;
+            left: 5px;
+            font-size: 12px;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            padding: 2px 4px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+        }
+
+        /* -------------------------
+           Подписи a-f и 1-6
+        ------------------------- */
+
+        .rank-label,
+        .file-label {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .legend {
+            margin-top: 20px;
+            line-height: 1.7;
+            color: #cccccc;
+        }
+
+        .red-dot,
+        .green-box {
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        .red-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #d74646;
+        }
+
+        .green-box {
+            width: 15px;
+            height: 15px;
+            border: 3px solid #34c759;
+        }
+
+        @media (max-width: 560px) {
+            body {
+                padding: 16px;
+            }
+
+            .container {
+                gap: 28px;
+            }
+
+            .board-area {
+                width: calc(100vw - 32px);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>KTaNE — Chess Solver</h1>
+
+<div class="container">
+
+    <!-- =====================================================
+         ВВОД ДАННЫХ
+    ====================================================== -->
+
+    <div class="panel">
+
+        <div class="serial-block">
+            <label for="serial">Серийный номер</label>
+            <input id="serial" type="text" placeholder="Например: AB3CD7" autocomplete="off">
+        </div>
+
+        <div class="coordinates">
+            <div class="coord-row">
+                <label for="coord1">Позиция №1</label>
+                <input id="coord1" class="coord" maxlength="2" placeholder="a1" autocomplete="off">
+            </div>
+
+            <div class="coord-row">
+                <label for="coord2">Позиция №2</label>
+                <input id="coord2" class="coord" maxlength="2" placeholder="b4" autocomplete="off">
+            </div>
+
+            <div class="coord-row">
+                <label for="coord3">Позиция №3</label>
+                <input id="coord3" class="coord" maxlength="2" placeholder="c5" autocomplete="off">
+            </div>
+
+            <div class="coord-row">
+                <label for="coord4">Позиция №4</label>
+                <input id="coord4" class="coord" maxlength="2" placeholder="d2" autocomplete="off">
+            </div>
+
+            <div class="coord-row">
+                <label for="coord5">Позиция №5</label>
+                <input id="coord5" class="coord" maxlength="2" placeholder="e3" autocomplete="off">
+            </div>
+
+            <div class="coord-row">
+                <label for="coord6">Позиция №6</label>
+                <input id="coord6" class="coord" maxlength="2" placeholder="f6" autocomplete="off">
+            </div>
+        </div>
+
+        <button id="solveButton" type="button">Рассчитать</button>
+
+        <div id="error" class="error" role="alert"></div>
+
+        <div id="result" class="result" aria-live="polite">
+            <div>Непокрытая клетка:</div>
+            <div id="answer" class="answer"></div>
+            <div id="piecesList" class="pieces-list"></div>
+        </div>
+
+    </div>
+
+    <!-- =====================================================
+         ДОСКА
+    ====================================================== -->
+
+    <div class="board-area">
+        <div class="board-wrapper" id="boardWrapper">
+            <div class="rank-label" style="grid-column:1; grid-row:1">6</div>
+            <div class="rank-label" style="grid-column:1; grid-row:2">5</div>
+            <div class="rank-label" style="grid-column:1; grid-row:3">4</div>
+            <div class="rank-label" style="grid-column:1; grid-row:4">3</div>
+            <div class="rank-label" style="grid-column:1; grid-row:5">2</div>
+            <div class="rank-label" style="grid-column:1; grid-row:6">1</div>
+
+            <div id="board" class="board"></div>
+
+            <div class="file-label" style="grid-column:2; grid-row:7">a</div>
+            <div class="file-label" style="grid-column:3; grid-row:7">b</div>
+            <div class="file-label" style="grid-column:4; grid-row:7">c</div>
+            <div class="file-label" style="grid-column:5; grid-row:7">d</div>
+            <div class="file-label" style="grid-column:6; grid-row:7">e</div>
+            <div class="file-label" style="grid-column:7; grid-row:7">f</div>
+        </div>
+
+        <div class="legend">
+            <div><span class="red-dot"></span>клетка покрывается хотя бы одной фигурой</div>
+            <div><span class="green-box"></span>искомая клетка</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    /* ============================================================
+       НАСТРОЙКИ ФИГУР
+    ============================================================ */
+
+    const pieceSymbols = {
+        K: "♚",
+        Q: "♛",
+        R: "♜",
+        B: "♝",
+        N: "♞"
+    };
+
+    const pieceNames = {
+        K: "Король",
+        Q: "Ферзь",
+        R: "Ладья",
+        B: "Слон",
+        N: "Конь"
+    };
+
+    /* ============================================================
+       СОЗДАНИЕ ДОСКИ
+    ============================================================ */
+
+    const boardElement = document.getElementById("board");
+
+    function createBoard() {
+        boardElement.innerHTML = "";
+
+        /* В HTML доска строится сверху вниз: 6, 5, 4, 3, 2, 1. */
+        for (let y = 6; y >= 1; y--) {
+            for (let x = 1; x <= 6; x++) {
+                const cell = document.createElement("div");
+                const coordinate = String.fromCharCode(96 + x) + y;
+
+                cell.dataset.coordinate = coordinate;
+                cell.className = (x + y) % 2 === 0
+                    ? "cell black"
+                    : "cell white";
+
+                boardElement.appendChild(cell);
+            }
+        }
+    }
+
+    /* ============================================================
+       КООРДИНАТА -> ЧИСЛА
+       Например: c4 -> { x: 3, y: 4 }
+    ============================================================ */
+
+    function parseCoordinate(coordinate) {
+        return {
+            x: coordinate.charCodeAt(0) - 96,
+            y: Number(coordinate[1])
+        };
+    }
+
+    /* ============================================================
+       ОПРЕДЕЛЯЕМ ФИГУРЫ
+    ============================================================ */
+
+    function determinePieces(coordinates, lastSerialDigit) {
+        const pieces = new Array(6);
+
+        const p5 = parseCoordinate(coordinates[4]);
+        const position5IsWhite = (p5.x + p5.y) % 2 === 1;
+
+        /* №5: белая клетка -> ферзь, чёрная -> ладья. */
+        pieces[4] = position5IsWhite ? "Q" : "R";
+
+        /* №1: король, если №5 — ферзь; иначе слон. */
+        pieces[0] = pieces[4] === "Q" ? "K" : "B";
+
+        /* №2: нечётная последняя цифра -> ладья; чётная -> конь. */
+        pieces[1] = lastSerialDigit % 2 === 1 ? "R" : "N";
+
+        /* №4 всегда ладья. */
+        pieces[3] = "R";
+
+        /* №3: ферзь, если ладей меньше двух; иначе король. */
+        let rookCount = 0;
+        if (pieces[1] === "R") rookCount++;
+        if (pieces[3] === "R") rookCount++;
+        if (pieces[4] === "R") rookCount++;
+        pieces[2] = rookCount < 2 ? "Q" : "K";
+
+        /* №6: ферзь, если ферзей нет; иначе конь, если коней нет; иначе слон. */
+        const hasQueen = pieces.slice(0, 5).includes("Q");
+        const hasKnight = pieces.slice(0, 5).includes("N");
+
+        if (!hasQueen) {
+            pieces[5] = "Q";
+        } else if (!hasKnight) {
+            pieces[5] = "N";
+        } else {
+            pieces[5] = "B";
+        }
+
+        return pieces;
+    }
+
+    /* ============================================================
+       ПРОВЕРКА БЛОКИРОВКИ
+       Используется для ладьи, слона и ферзя.
+    ============================================================ */
+
+    function pathIsClear(startX, startY, targetX, targetY, occupied) {
+        const stepX = Math.sign(targetX - startX);
+        const stepY = Math.sign(targetY - startY);
+
+        let x = startX + stepX;
+        let y = startY + stepY;
+
+        while (x !== targetX || y !== targetY) {
+            const coordinate = String.fromCharCode(96 + x) + y;
+
+            if (occupied.has(coordinate)) {
+                return false;
+            }
+
+            x += stepX;
+            y += stepY;
+        }
+
+        return true;
+    }
+
+    /* ============================================================
+       МОЖЕТ ЛИ ФИГУРА ПОКРЫТЬ КЛЕТКУ?
+    ============================================================ */
+
+    function canAttack(piece, startCoordinate, targetCoordinate, occupied) {
+        if (startCoordinate === targetCoordinate) {
+            return false;
+        }
+
+        const start = parseCoordinate(startCoordinate);
+        const target = parseCoordinate(targetCoordinate);
+        const dx = Math.abs(target.x - start.x);
+        const dy = Math.abs(target.y - start.y);
+
+        if (piece === "K") {
+            return dx <= 1 && dy <= 1;
+        }
+
+        if (piece === "N") {
+            return (dx === 1 && dy === 2) || (dx === 2 && dy === 1);
+        }
+
+        if (piece === "R") {
+            const validDirection = start.x === target.x || start.y === target.y;
+            return validDirection && pathIsClear(
+                start.x, start.y, target.x, target.y, occupied
+            );
+        }
+
+        if (piece === "B") {
+            return dx === dy && pathIsClear(
+                start.x, start.y, target.x, target.y, occupied
+            );
+        }
+
+        if (piece === "Q") {
+            const straight = start.x === target.x || start.y === target.y;
+            const diagonal = dx === dy;
+
+            return (straight || diagonal) && pathIsClear(
+                start.x, start.y, target.x, target.y, occupied
+            );
+        }
+
+        return false;
+    }
+
+    /* ============================================================
+       ПОЛУЧАЕМ ВСЕ 36 КЛЕТОК
+    ============================================================ */
+
+    function getAllSquares() {
+        const squares = [];
+
+        for (let y = 1; y <= 6; y++) {
+            for (let x = 1; x <= 6; x++) {
+                squares.push(String.fromCharCode(96 + x) + y);
+            }
+        }
+
+        return squares;
+    }
+
+    /* ============================================================
+       РЕШАЕМ ЗАДАЧУ
+    ============================================================ */
+
+    function solveChess(coordinates, pieces) {
+        const squares = getAllSquares();
+        const occupied = new Set(coordinates);
+        const attackedSquares = new Set();
+
+        for (const target of squares) {
+            for (let i = 0; i < 6; i++) {
+                if (canAttack(pieces[i], coordinates[i], target, occupied)) {
+                    attackedSquares.add(target);
+                    break;
+                }
+            }
+        }
+
+        const safeSquares = squares.filter(
+            square => !attackedSquares.has(square)
+        );
+
+        return { attackedSquares, safeSquares };
+    }
+
+    /* ============================================================
+       ОТРИСОВКА РЕЗУЛЬТАТА
+    ============================================================ */
+
+    function drawResult(coordinates, pieces, attackedSquares, safeSquares) {
+        createBoard();
+
+        for (const cell of boardElement.querySelectorAll(".cell")) {
+            const coordinate = cell.dataset.coordinate;
+
+            if (attackedSquares.has(coordinate)) {
+                cell.classList.add("attacked");
+            }
+
+            if (safeSquares.includes(coordinate)) {
+                cell.classList.add("safe");
+            }
+        }
+
+        coordinates.forEach((coordinate, index) => {
+            const cell = boardElement.querySelector(
+                `[data-coordinate="${coordinate}"]`
+            );
+
+            cell.textContent = pieceSymbols[pieces[index]];
+            cell.title = `Позиция №${index + 1}: ${pieceNames[pieces[index]]}`;
+
+            const number = document.createElement("span");
+            number.className = "piece-number";
+            number.textContent = index + 1;
+            cell.appendChild(number);
+        });
+    }
+
+    /* ============================================================
+       ПРОВЕРКА ВВОДА И ЗАПУСК
+    ============================================================ */
+
+    const serialInput = document.getElementById("serial");
+    const coordinateInputs = [...document.querySelectorAll(".coord")];
+    const solveButton = document.getElementById("solveButton");
+    const errorElement = document.getElementById("error");
+    const resultElement = document.getElementById("result");
+    const answerElement = document.getElementById("answer");
+    const piecesListElement = document.getElementById("piecesList");
+
+    function showError(message) {
+        errorElement.textContent = message;
+        resultElement.style.display = "none";
+        createBoard();
+    }
+
+    function solveFromInputs() {
+        errorElement.textContent = "";
+
+        const serial = serialInput.value.trim();
+        const coordinates = coordinateInputs.map(
+            input => input.value.trim().toLowerCase()
+        );
+
+        const serialDigits = serial.match(/\d/g);
+        if (!serialDigits) {
+            showError("Серийный номер должен содержать хотя бы одну цифру.");
+            return;
+        }
+
+        const invalidCoordinate = coordinates.find(
+            coordinate => !/^[a-f][1-6]$/.test(coordinate)
+        );
+
+        if (invalidCoordinate !== undefined) {
+            showError("Введите все 6 координат в формате a1–f6.");
+            return;
+        }
+
+        if (new Set(coordinates).size !== 6) {
+            showError("Все 6 координат должны быть уникальными.");
+            return;
+        }
+
+        const lastSerialDigit = Number(serialDigits.at(-1));
+        const pieces = determinePieces(coordinates, lastSerialDigit);
+        const { attackedSquares, safeSquares } = solveChess(coordinates, pieces);
+
+        drawResult(coordinates, pieces, attackedSquares, safeSquares);
+
+        answerElement.textContent = safeSquares.length === 1
+            ? safeSquares[0]
+            : safeSquares.join(", ");
+
+        piecesListElement.innerHTML = pieces.map((piece, index) =>
+            `№${index + 1}: ${pieceSymbols[piece]} ${pieceNames[piece]} — ${coordinates[index]}`
+        ).join("<br>");
+
+        if (safeSquares.length === 0) {
+            errorElement.textContent = "Непокрытых клеток не найдено. Проверьте введённые данные.";
+            answerElement.textContent = "—";
+        } else if (safeSquares.length > 1) {
+            errorElement.textContent = `Найдено несколько непокрытых клеток: ${safeSquares.length}. Проверьте введённые данные.`;
+        }
+
+        resultElement.style.display = "block";
+    }
+
+    coordinateInputs.forEach((input, index) => {
+        input.addEventListener("input", () => {
+            input.value = input.value.toLowerCase().replace(/[^a-f1-6]/g, "").slice(0, 2);
+        });
+
+        input.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                if (index < coordinateInputs.length - 1) {
+                    coordinateInputs[index + 1].focus();
+                } else {
+                    solveFromInputs();
+                }
+            }
+        });
+    });
+
+    serialInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            coordinateInputs[0].focus();
+        }
+    });
+
+    solveButton.addEventListener("click", solveFromInputs);
+
+    createBoard();
+</script>
+
+</body>
+</html>
