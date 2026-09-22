@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Модули</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; }
+  h1 { margin: 0 0 .25rem; }
+  .muted { color: #666; font-size: .9em; }
+  ul { padding-left: 1.25rem; }
+  li { margin: .25rem 0; }
+  .err { color: #b00020; white-space: pre-wrap; }
+  code { background: #f2f2f2; padding: .1em .3em; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <h1>Модули</h1>
+  <p class="muted" id="status">Загрузка…</p>
+  <ul id="list"></ul>
+
+<script>
+(async () => {
+  // ── Настройки ────────────────────────────────────────────────────────────
+  // Всё можно оставить null — тогда определится автоматически.
+  const CFG = {
+    owner: null,        // 'octocat'
+    repo:  null,        // 'my-project' или 'octocat.github.io'
+    branch: 'HEAD',     // 'main' / 'master' / 'HEAD'
+    dir:   null,        // папка от корня репо; null = папка, где лежит этот index.html
+    recursive: false,   // false — только файлы из этой папки; true — включая подпапки
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const statusEl = document.getElementById('status');
+  const listEl   = document.getElementById('list');
+
+  try {
+    const ctx = await detectRepo();
+    const files = await loadHtmlFiles(ctx);
+    render(files, ctx);
+  } catch (e) {
+    statusEl.textContent = '';
+    const p = document.createElement('p');
+    p.className = 'err';
+    p.textContent = 'Ошибка: ' + e.message;
+    document.body.appendChild(p);
+    console.error(e);
+  }
+
+  // Определяем owner/repo/каталог, в котором лежит этот index.html
+  async function detectRepo() {
+    const m = location.hostname.match(/^([^.]+)\.github\.io$/i);
+    if (!m) {
+      if (!CFG.owner || !CFG.repo)
+        throw new Error('Это не *.github.io — задайте CFG.owner и CFG.repo вручную.');
+    }
+    const autoOwner = m ? m[1] : null;
+
+    const owner = CFG.owner || autoOwner;
+    const segs  = location.pathname.split('/').filter(Boolean);
+    let repo = CFG.repo;
+    let rootSegs = 0;
+
+    if (!repo) {
+      // project page: /<repo>/...   |   user page: /...
+      if (segs.length && await repoExists(owner, segs[0])) {
+        repo = segs[0];
+        rootSegs = 1;
+      } else {
+        repo = `${owner}.github.io`;
+        rootSegs = 0;
+      }
+    } else {
+      const i = segs.indexOf(repo);
+      if (i !== -1) rootSegs = i + 1;
+    }
+
+    const here = segs.slice(rootSegs);                 // путь внутри репо, включая index.html
+    const dir = CFG.dir !== null
+      ? CFG.dir.replace(/^\/+|\/+$/g, '')
+      : here.slice(0, -1).join('/');                   // папка текущей страницы
+
+    const currentPath = here.join('/');                // чтобы не ссылаться на себя
+
+    return { owner, repo, dir, branch: CFG.branch, currentPath };
+  }
+
+  async function repoExists(owner, repo) {
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+      headers: { Accept: 'application/vnd.github+json' }
+    });
+    return r.ok;
+  }
+
+  async function loadHtmlFiles({ owner, repo, dir, branch, currentPath }) {
+    const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+    const r = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) {
+      if (r.status === 403)
+        throw new Error('GitHub API rate limit (60/час на IP). Попробуйте позже.');
+      throw new Error(`GitHub API ${r.status}: ${await r.text()}`);
+    }
+    const data = await r.json();
+    if (data.truncated) console.warn('Дерево усечено GitHub API — часть файлов может отсутствовать.');
+
+    const prefix = dir ? dir + '/' : '';
+    return data.tree
+      .filter(t => t.type === 'blob')
+      .filter(t => t.path.startsWith(prefix))
+      .filter(t => t.path.toLowerCase().endsWith('.html'))
+      .filter(t => t.path !== currentPath)             // не показываем сам index.html
+      .filter(t => CFG.recursive || !t.path.slice(prefix.length).includes('/'))
+      .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
+  }
+
+  function render(files, { dir }) {
+    if (!files.length) {
+      statusEl.textContent = 'HTML-файлов не найдено.';
+      return;
+    }
+    statusEl.textContent = `Найдено: ${files.length}`;
+
+    const base = dir ? dir + '/' : '';
+    for (const f of files) {
+      const rel  = f.path.slice(base.length);         // путь относительно текущей страницы
+      const name = rel.replace(/\.html?$/i, '');
+
+      const li = document.createElement('li');
+      const a  = document.createElement('a');
+      a.href = encodeURI(rel);
+      a.textContent = name;
+      li.appendChild(a);
+      listEl.appendChild(li);
+    }
+  }
+})();
+</script>
+</body>
+</html>
