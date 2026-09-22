@@ -5,19 +5,147 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Модули</title>
 <style>
-  body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; }
-  h1 { margin: 0 0 .25rem; }
-  .muted { color: #666; font-size: .9em; }
-  ul { padding-left: 1.25rem; }
-  li { margin: .25rem 0; }
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfd;
+    --fg: #16181d;
+    --muted: #6b7280;
+    --card: #ffffff;
+    --border: #e6e8ec;
+    --border-hover: #b9bfca;
+    --accent: #2f6feb;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 10px 28px -14px rgba(16,24,40,.25);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1013;
+      --fg: #e8eaee;
+      --muted: #8b93a1;
+      --card: #15181d;
+      --border: #23272e;
+      --border-hover: #3a4049;
+      --accent: #6b9bff;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 12px 32px -16px rgba(0,0,0,.8);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 2rem);
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  /* ── Шапка ───────────────────────────────────────────────── */
+  header { margin-bottom: 1.5rem; }
+  h1 {
+    margin: 0 0 .3rem;
+    font-size: clamp(1.4rem, 3vw, 1.9rem);
+    font-weight: 650;
+    letter-spacing: -.02em;
+  }
+  .muted { margin: 0; color: var(--muted); font-size: .875rem; }
+  #where { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; opacity: .8; }
+
+  /* ── Поиск ───────────────────────────────────────────────── */
+  .search {
+    width: 100%;
+    margin: 0 0 1rem;
+    padding: .65rem .9rem;
+    font: inherit;
+    font-size: .95rem;
+    color: inherit;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .search::placeholder { color: var(--muted); }
+  .search:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+
+  /* ── Сетка панелей ───────────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: .7rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .grid > li { min-width: 0; }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    min-height: 62px;
+    padding: .8rem 1rem;
+    color: inherit;
+    text-decoration: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color .15s, box-shadow .15s, transform .15s;
+  }
+  .card:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+  }
+  .card:active { transform: translateY(0); }
+  .card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .card__title {
+    font-size: .95rem;
+    font-weight: 550;
+    letter-spacing: -.01em;
+    overflow-wrap: anywhere;
+  }
+  .card__path {
+    margin-top: .15rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .75rem;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+
+  .empty { margin: 1rem 0 0; color: var(--muted); font-size: .9rem; }
   .err { color: #b00020; white-space: pre-wrap; }
-  code { background: #f2f2f2; padding: .1em .3em; border-radius: 4px; }
+  @media (prefers-color-scheme: dark) { .err { color: #ff8a9b; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card { transition: none; }
+    .card:hover { transform: none; }
+  }
 </style>
 </head>
 <body>
-  <h1>Модули</h1>
-  <p class="muted" id="status">Загрузка…</p>
-  <ul id="list"></ul>
+  <div class="wrap">
+    <header>
+      <h1>Модули</h1>
+      <p class="muted" id="status">Загрузка…</p>
+      <p class="muted" id="where"></p>
+    </header>
+
+    <input id="search" class="search" type="search" placeholder="Поиск…" autocomplete="off" hidden>
+    <ul id="list" class="grid"></ul>
+    <p class="empty" id="empty" hidden>Ничего не найдено.</p>
+  </div>
 
 <script>
 (async () => {
@@ -33,7 +161,10 @@
   // ─────────────────────────────────────────────────────────────────────────
 
   const statusEl = document.getElementById('status');
+  const whereEl  = document.getElementById('where');
+  const searchEl = document.getElementById('search');
   const listEl   = document.getElementById('list');
+  const emptyEl  = document.getElementById('empty');
 
   try {
     const ctx = await detectRepo();
@@ -44,7 +175,7 @@
     const p = document.createElement('p');
     p.className = 'err';
     p.textContent = 'Ошибка: ' + e.message;
-    document.body.appendChild(p);
+    document.querySelector('header').appendChild(p);
     console.error(e);
   }
 
@@ -109,29 +240,81 @@
       .filter(t => t.type === 'blob')
       .filter(t => t.path.startsWith(prefix))
       .filter(t => t.path.toLowerCase().endsWith('.html'))
-      .filter(t => t.path !== currentPath)             // не показываем сам index.html
+      .filter(t => !/(^|\/)index\.html?$/i.test(t.path))  // игнорируем любые index.html
+      .filter(t => t.path !== currentPath)                // и саму текущую страницу
       .filter(t => CFG.recursive || !t.path.slice(prefix.length).includes('/'))
       .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
   }
 
-  function render(files, { dir }) {
-    if (!files.length) {
+  function render(files, { dir, owner, repo }) {
+    const base = dir ? dir + '/' : '';
+    const items = files.map(f => {
+      const rel  = f.path.slice(base.length);
+      const name = rel.replace(/\.html?$/i, '');
+      const cut  = name.lastIndexOf('/');
+      return {
+        rel,
+        name,
+        folder: cut === -1 ? '' : name.slice(0, cut)
+      };
+    });
+
+    whereEl.textContent = `${owner}/${repo}` + (dir ? '/' + dir : '');
+
+    if (!items.length) {
       statusEl.textContent = 'HTML-файлов не найдено.';
       return;
     }
-    statusEl.textContent = `Найдено: ${files.length}`;
 
-    const base = dir ? dir + '/' : '';
-    for (const f of files) {
-      const rel  = f.path.slice(base.length);         // путь относительно текущей страницы
-      const name = rel.replace(/\.html?$/i, '');
-
+    // ── Панели ──────────────────────────────────────────────
+    const frag = document.createDocumentFragment();
+    for (const it of items) {
       const li = document.createElement('li');
-      const a  = document.createElement('a');
-      a.href = encodeURI(rel);
-      a.textContent = name;
+      li.dataset.search = (it.name + ' ' + it.folder).toLowerCase();
+
+      const a = document.createElement('a');
+      a.className = 'card';
+      a.href = encodeURI(it.rel);
+
+      const title = document.createElement('span');
+      title.className = 'card__title';
+      title.textContent = it.name;
+      a.appendChild(title);
+
+      if (it.folder) {
+        const path = document.createElement('span');
+        path.className = 'card__path';
+        path.textContent = it.folder + '/';
+        a.appendChild(path);
+      }
+
       li.appendChild(a);
-      listEl.appendChild(li);
+      frag.appendChild(li);
+    }
+    listEl.appendChild(frag);
+
+    // ── Поиск (появляется, когда ссылок становится много) ────
+    const total = items.length;
+    const setStatus = (shown) => {
+      statusEl.textContent = shown === total
+        ? `Найдено: ${total}`
+        : `Показано: ${shown} из ${total}`;
+    };
+    setStatus(total);
+
+    if (total > 5) {
+      searchEl.hidden = false;
+      searchEl.addEventListener('input', () => {
+        const q = searchEl.value.trim().toLowerCase();
+        let shown = 0;
+        for (const li of listEl.children) {
+          const hit = !q || li.dataset.search.includes(q);
+          li.hidden = !hit;
+          if (hit) shown++;
+        }
+        setStatus(shown);
+        emptyEl.hidden = shown > 0;
+      });
     }
   }
 })();
