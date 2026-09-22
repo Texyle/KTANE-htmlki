@@ -1,0 +1,50 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KTaNE — Семь смертных грехов</title>
+<style>
+body{margin:0;background:#18232d;color:#eef3f6;font-family:Arial,sans-serif}main{max-width:900px;margin:auto;padding:28px 18px}h1,.sub{text-align:center}.sub{color:#aebbc5}
+.board{position:relative;width:min(620px,92vw);aspect-ratio:1;margin:20px auto;border-radius:50%;border:2px solid #526776;background:#1d2b36}
+.slot{position:absolute;width:120px;transform:translate(-50%,-50%);text-align:center}.slot b{display:block;margin-bottom:5px}.slot select{width:100%;padding:8px;border-radius:7px;font-weight:bold}
+.s1{left:50%;top:9%}.s2{left:82%;top:28%}.s3{left:89%;top:64%}.s4{left:68%;top:89%}.s5{left:32%;top:89%}.s6{left:11%;top:64%}.s7{left:18%;top:28%}
+.center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:#aebbc5}
+button{display:block;margin:auto;padding:12px 24px;border:0;border-radius:8px;background:#e74c3c;color:white;font-size:17px;font-weight:bold;cursor:pointer}
+#out{max-width:700px;margin:22px auto;background:#243746;border-radius:10px;padding:18px;display:none}.step{padding:10px;margin:8px 0;border-left:4px solid #f2c94c;background:#1c2c38}.step strong{color:#f2c94c}.error{color:#ff6b6b;font-weight:bold}.ok{color:#56d38b;font-weight:bold}
+@media(max-width:620px){.slot{width:92px;font-size:12px}.center{font-size:11px}}
+</style></head><body><main>
+<h1>Семь смертных грехов — Solver</h1><div class="sub">Укажите цвета кнопок, начиная сверху и далее по часовой стрелке.</div>
+<div class="board">
+<div class="slot s1"><b>1 — верх</b><select></select></div><div class="slot s2"><b>2</b><select></select></div><div class="slot s3"><b>3</b><select></select></div><div class="slot s4"><b>4</b><select></select></div><div class="slot s5"><b>5</b><select></select></div><div class="slot s6"><b>6</b><select></select></div><div class="slot s7"><b>7</b><select></select></div>
+<div class="center">Позиции идут<br><b>по часовой стрелке</b></div></div>
+<div style="display:flex;gap:10px;justify-content:center">
+<button onclick="solve()" style="margin:0">Выдать решение</button>
+<button onclick="resetAll()" style="margin:0;background:#7f8c8d">Сброс</button>
+</div><div id="out"></div>
+<script>
+const C=[["","— выберите —"],["yellow","Жёлтый — Похоть"],["blue","Синий/фиолетовый — Чревоугодие"],["red","Красный — Жадность"],["pink","Розовый — Лень"],["mint","Мятный — Гнев"],["green","Зелёный — Зависть"],["brown","Коричневый — Гордыня"]];
+const S={yellow:"Похоть",blue:"Чревоугодие",red:"Жадность",pink:"Лень",mint:"Гнев",green:"Зависть",brown:"Гордыня"};
+const COLOR_NAME={"Похоть":"Жёлтый","Чревоугодие":"Синий/фиолетовый","Жадность":"Красный","Лень":"Розовый","Гнев":"Мятный","Зависть":"Зелёный","Гордыня":"Коричневый"};
+const A={
+"Гордыня":new Set(["Похоть","Чревоугодие","Жадность","Лень"]),
+"Похоть":new Set(["Чревоугодие","Жадность","Гнев"]),
+"Чревоугодие":new Set(["Жадность","Лень","Зависть"]),
+"Жадность":new Set(["Лень","Гнев"]),
+"Лень":new Set(["Гнев","Зависть","Похоть"]),
+"Гнев":new Set(["Зависть","Гордыня","Чревоугодие"]),
+"Зависть":new Set(["Гордыня","Похоть","Жадность"])};
+document.querySelectorAll("select").forEach(s=>C.forEach(([v,t])=>{let o=document.createElement("option");o.value=v;o.textContent=t;s.appendChild(o)}));
+function adj(a,b){let d=Math.abs(a-b);return d===1||d===6}
+function perms(a){if(a.length<2)return[a];let r=[];for(let i=0;i<a.length;i++){let q=a.slice(0,i).concat(a.slice(i+1));for(let p of perms(q))r.push([a[i],...p])}return r}
+function valid(o,pos){for(let i=0;i<6;i++)if(!A[o[i]].has(o[i+1]))return false;let done=[o[0]];for(let i=1;i<7;i++){if(!done.some(x=>adj(pos[o[i]],pos[x])))return false;done.push(o[i])}return true}
+function solve(){let out=document.getElementById("out");out.style.display="block";let v=[...document.querySelectorAll("select")].map(x=>x.value);
+if(v.some(x=>!x)){out.innerHTML='<div class="error">Заполните все 7 позиций.</div>';return}
+if(new Set(v).size!==7){out.innerHTML='<div class="error">Каждый цвет должен использоваться ровно один раз.</div>';return}
+let sins=v.map(x=>S[x]),pos={};sins.forEach((x,i)=>pos[x]=i);let sols=perms(sins).filter(x=>valid(x,pos));
+if(!sols.length){out.innerHTML='<div class="error">Решение не найдено. Проверьте порядок цветов.</div>';return}
+let o=sols[0],done=[],h='<div class="ok">Нажимайте по порядку:</div>';
+o.forEach((x,i)=>{h+=`<div class="step"><strong>${i+1}. ${COLOR_NAME[x]}</strong> — позиция ${pos[x]+1}</div>`;done.push(x)});
+h+=`<small>Корректных полных последовательностей: ${sols.length}. Показана одна.</small>`;out.innerHTML=h}
+function resetAll(){
+document.querySelectorAll("select").forEach(s=>s.selectedIndex=0);
+const out=document.getElementById("out");
+out.innerHTML="";
+out.style.display="none";
+}
+</script></main></body></html>
