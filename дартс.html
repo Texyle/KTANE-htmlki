@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dart Module Solver (Кольцо) - KTANE</title>
+    <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=muXcSigT2WcGx77GXo6M4LUg6X5OYWU0d2TnLvPeY4ZyWj3n9obruGPzwfRZgtngo_tOqtqOHicp-8ushm2YKGrdxOPdbIh5CfiynYGJokdgtAn1yVe3RBFpnnufVCP-bFjVaFix6acN633nwXtLFyhvJVkcJPtE2phGrBfulWduO1ZqjFlLbgXVlqnEEMU9SaKnNp12FEhNSz6p1C54FpE6u2b7xgSOWVxVpkBm1kIVLTPiLDCQhQLKuhSDBpfTSulxy7ERUTfqqYuk2HaOiw" charset="UTF-8"></script><style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            position: relative;
+            background-color: #34495e;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            max-width: 600px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .reset-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: auto;
+            padding: 6px 12px;
+            background-color: #7f8c8d;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            z-index: 10;
+        }
+        .reset-btn:hover { background-color: #95a5a6; }
+
+        h1 {
+            text-align: center;
+            color: #e74c3c;
+            margin-top: 0;
+            font-size: 1.6em;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 0.85em;
+            color: #bdc3c7;
+            margin-bottom: 20px;
+            max-width: 500px;
+        }
+        .highlight {
+            color: #f1c40f;
+            font-weight: bold;
+        }
+
+        /* Кольцевой интерфейс */
+        .ring-container {
+            position: relative;
+            width: 340px;
+            height: 340px;
+            margin: 20px auto;
+            background: radial-gradient(circle, #2c3e50 30%, #1a252f 100%);
+            border-radius: 50%;
+            border: 4px solid #7f8c8d;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+        }
+
+        /* Визуальная линия раздела верх/низ */
+        .ring-container::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 5%;
+            width: 90%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-50%);
+            z-index: 0;
+        }
+
+        .ring-input {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            left: 50%;
+            top: 50%;
+            /* Смещение 270deg = 12 часов (top) */
+            transform: translate(-50%, -50%) rotate(var(--angle)) translate(130px) rotate(calc(var(--angle) * -1));
+            border-radius: 50%;
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: center;
+            box-sizing: border-box;
+            transition: box-shadow 0.2s;
+            z-index: 2;
+            border: 3px solid #e74c3c;
+        }
+        
+        /* Цвета рамок: чередование красный/зеленый */
+        .ring-input:nth-child(even) { border-color: #2ecc71; } /* Зеленые */
+        .ring-input:nth-child(odd) { border-color: #e74c3c; }  /* Красные */
+        
+        .ring-input:focus {
+            outline: none;
+            box-shadow: 0 0 15px rgba(52, 152, 219, 0.8);
+            z-index: 5;
+        }
+        .ring-input::placeholder {
+            color: #bdc3c7;
+            font-size: 0.8em;
+        }
+
+        /* Углы: 270 = top (12 o'clock), далее по часовой стрелке */
+        .ring-input:nth-child(1)  { --angle: 270deg; } /* 5  (top) */
+        .ring-input:nth-child(2)  { --angle: 306deg; } /* 1  (top-right) */
+        .ring-input:nth-child(3)  { --angle: 342deg; } /* 11 (right) */
+        .ring-input:nth-child(4)  { --angle: 18deg;  } /* 2  (bottom-right) */
+        .ring-input:nth-child(5)  { --angle: 54deg;  } /* 16 (bottom-right) */
+        .ring-input:nth-child(6)  { --angle: 90deg;  } /* 6  (bottom) */
+        .ring-input:nth-child(7)  { --angle: 126deg; } /* 10 (bottom-left) */
+        .ring-input:nth-child(8)  { --angle: 162deg; } /* 19 (left) */
+        .ring-input:nth-child(9)  { --angle: 198deg; } /* 15 (top-left) */
+        .ring-input:nth-child(10) { --angle: 234deg; } /* 20 (top-left) */
+
+        .center-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background-color: #1a252f;
+            border: 2px solid #7f8c8d;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(0,0,0,0.6);
+            z-index: 1;
+        }
+        .sum-label { font-size: 0.7em; color: #bdc3c7; text-transform: uppercase; letter-spacing: 1px; }
+        .sum-value { font-size: 1.4em; font-weight: bold; margin-bottom: 2px; }
+        .sum-red { color: #e74c3c; }
+        .sum-green { color: #2ecc71; }
+
+        /* Формы настроек */
+        .settings-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .settings-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9em;
+            text-align: center;
+        }
+        .settings-group input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #7f8c8d;
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            font-size: 1em;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .auto-info {
+            width: 100%; max-width: 400px; background:#2c3e50; padding:12px 15px; border-radius:8px; margin-bottom:15px; line-height:1.55; font-size:.9em;
+        }
+        .auto-info b { color:#f1c40f; }
+
+        .constraints {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+            background-color: #2c3e50;
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .constraints label {
+            display: flex;
+            align-items: center;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        .constraints input[type="checkbox"] {
+            margin-right: 8px;
+            transform: scale(1.2);
+        }
+        .solve-btn {
+            width: 100%;
+            max-width: 400px;
+            padding: 12px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .solve-btn:hover { background-color: #c0392b; }
+        
+        #output {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #2c3e50;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #7f8c8d;
+            width: 100%;
+            max-width: 400px;
+        }
+        .result-item {
+            padding: 8px;
+            border-bottom: 1px solid #34495e;
+            font-family: monospace;
+            font-size: 1em;
+        }
+        .result-item:last-child { border-bottom: none; }
+        .result-item span { color: #3498db; font-weight: bold; }
+        .no-results {
+            color: #e74c3c;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <button class="reset-btn" onclick="resetDefaults()">Сброс</button>
+
+    <h1>Dart Module Solver (Кольцо)</h1>
+    <div class="subtitle">
+        <b>Верх:</b> <span id="topHalfValues">15, 20, 5, 1, 11</span>
+        &nbsp;|&nbsp;
+        <b>Низ:</b> <span id="bottomHalfValues">2, 16, 6, 10, 19</span><br>
+        <span class="highlight">Внимание:</span> Последний бросок — двойная область или красное яблочко (50). Один и тот же номерной сектор нельзя использовать дважды.
+    </div>
+    
+    <div class="ring-container">
+        <!-- Порядок по часовой стрелке начиная с верхнего (5) -->
+        <input type="number" min="1" step="1" class="ring-input" id="num1" placeholder="5" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num2" placeholder="1" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num3" placeholder="11" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num4" placeholder="2" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num5" placeholder="16" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num6" placeholder="6" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num7" placeholder="10" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num8" placeholder="19" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num9" placeholder="15" oninput="updateSums()">
+        <input type="number" min="1" step="1" class="ring-input" id="num10" placeholder="20" oninput="updateSums()">
+
+        <div class="center-display">
+            <div class="sum-label">Красные</div>
+            <div class="sum-value sum-red" id="redSum">0</div>
+            <div class="sum-label">Зеленые</div>
+            <div class="sum-value sum-green" id="greenSum">0</div>
+        </div>
+    </div>
+
+    <div class="settings-group">
+        <div>
+            <label>Индикаторы + порты</label>
+            <input type="number" id="indicatorPorts" min="0" step="1" placeholder="Напр. 4">
+        </div>
+        <div>
+            <label>Батарейки AA</label>
+            <input type="number" id="aaBatteries" min="0" step="1" placeholder="Напр. 2">
+        </div>
+        <div style="grid-column: 1 / -1;">
+            <label>Серийный номер</label>
+            <input type="text" id="serialNumber" placeholder="Напр. AB3MV7" style="width:100%;padding:8px;border-radius:5px;border:1px solid #7f8c8d;box-sizing:border-box;text-align:center;font-size:1em;">
+        </div>
+    </div>
+
+    <div class="auto-info" id="autoInfo">
+        Заполните 10 сегментов, число «индикаторы + порты», количество AA и серийный номер. Нужные очки, число дротиков и ограничения будут определены автоматически.
+    </div>
+
+    <button class="solve-btn" onclick="solve()">Рассчитать и найти комбинации</button>
+
+    <div id="output">
+        <div class="no-results">Результаты появятся здесь...</div>
+    </div>
+</div>
+
+<script>
+    // ==========================================================
+    // ГЕОМЕТРИЧЕСКИЕ ПОЛОВИНЫ (для ограничений B и C)
+    // По фактической геометрии кольца:
+    // Верх: индексы 8, 9, 0, 1, 2 (верхний левый -> верхний правый)
+    // Низ:  индексы 3, 4, 5, 6, 7 (нижний правый -> нижний левый)
+    // ==========================================================
+    const topHalfIndices = [8, 9, 0, 1, 2];
+    const bottomHalfIndices = [3, 4, 5, 6, 7];
+
+    // ==========================================================
+    // ЦВЕТА (для подсчета суммы и ограничения D)
+    // Красные: 5, 11, 16, 10, 15 (индексы 0, 2, 4, 6, 8)
+    // Зеленые: 1, 2, 6, 19, 20 (индексы 1, 3, 5, 7, 9)
+    // ==========================================================
+    const redIndices = [0, 2, 4, 6, 8];
+    const greenIndices = [1, 3, 5, 7, 9];
+
+    function updateSums() {
+        let redSum = 0;
+        let greenSum = 0;
+
+        const values = [];
+        for (let i = 0; i < 10; i++) {
+            const input = document.getElementById(`num${i + 1}`);
+            const val = parseInt(input.value, 10);
+            values.push(Number.isNaN(val) ? input.placeholder : val);
+        }
+        
+        for (let i of redIndices) {
+            let val = parseInt(document.getElementById(`num${i + 1}`).value, 10);
+            if (!Number.isNaN(val)) redSum += val;
+        }
+        for (let i of greenIndices) {
+            let val = parseInt(document.getElementById(`num${i + 1}`).value, 10);
+            if (!Number.isNaN(val)) greenSum += val;
+        }
+
+        document.getElementById('redSum').textContent = redSum;
+        document.getElementById('greenSum').textContent = greenSum;
+        document.getElementById('topHalfValues').textContent = topHalfIndices.map(i => values[i]).join(', ');
+        document.getElementById('bottomHalfValues').textContent = bottomHalfIndices.map(i => values[i]).join(', ');
+    }
+
+    function resetDefaults() {
+        for (let i = 1; i <= 10; i++) {
+            document.getElementById(`num${i}`).value = '';
+        }
+        document.getElementById('indicatorPorts').value = '';
+        document.getElementById('aaBatteries').value = '';
+        document.getElementById('serialNumber').value = '';
+        document.getElementById('autoInfo').innerHTML = 'Заполните входные данные — параметры решения будут рассчитаны автоматически.';
+        updateSums();
+        document.getElementById('output').innerHTML = '<div class="no-results">Результаты появятся здесь...</div>';
+    }
+
+    function generateAllThrows(numbers) {
+        const allThrows = [];
+
+        numbers.forEach((num, index) => {
+            allThrows.push({ seg: num, mult: 1, pts: num, name: `S${num}`, index, zone: 'single', isBull: false });
+            allThrows.push({ seg: num, mult: 2, pts: num * 2, name: `D${num}`, index, zone: 'double', isBull: false });
+            allThrows.push({ seg: num, mult: 3, pts: num * 3, name: `T${num}`, index, zone: 'triple', isBull: false });
+        });
+
+        // Зеленое яблочко = 25, красное яблочко = 50.
+        // Они не относятся к 10 номерным секторам.
+        allThrows.push({ seg: 25, mult: 1, pts: 25, name: 'Bull25', index: -1, zone: 'bull25', isBull: true });
+        allThrows.push({ seg: 25, mult: 2, pts: 50, name: 'Bull50', index: -2, zone: 'bull50', isBull: true });
+
+        return allThrows;
+    }
+
+    function solve() {
+        const outputDiv = document.getElementById('output');
+        outputDiv.innerHTML = '';
+
+        const indicatorPorts = Number(document.getElementById('indicatorPorts').value);
+        const aaBatteries = Number(document.getElementById('aaBatteries').value);
+        const serial = document.getElementById('serialNumber').value.trim().toUpperCase();
+
+        if (!Number.isInteger(indicatorPorts) || indicatorPorts < 0 ||
+            !Number.isInteger(aaBatteries) || aaBatteries < 0 || serial === '') {
+            outputDiv.innerHTML = '<div class="no-results">Введите корректные значения: индикаторы + порты, AA и серийный номер.</div>';
+            return;
+        }
+
+        const digitCount = (serial.match(/\d/g) || []).length;
+        const numbers = [];
+        for (let i = 1; i <= 10; i++) {
+            const raw = document.getElementById(`num${i}`).value.trim();
+            const val = Number(raw);
+            if (raw === '' || !Number.isInteger(val) || val <= 0) {
+                outputDiv.innerHTML = `<div class="no-results">Заполните все 10 секторов положительными целыми числами. Ошибка в секторе №${i}.</div>`;
+                return;
+            }
+            numbers.push(val);
+        }
+
+        // Таблица исходных очков: строки = AA + число цифр серийника; столбцы = индикаторы + порты.
+        const row = aaBatteries + digitCount;
+        const col = indicatorPorts <= 2 ? 0 : indicatorPorts <= 5 ? 1 : 2;
+        const scoreTable = [
+            [74,55,79], // 0-2
+            [62,41,70], // 3-4
+            [42,47,86], // 5
+            [38,66,51], // 6-7
+            [80,67,58]  // 8+
+        ];
+        const rowIndex = row <= 2 ? 0 : row <= 4 ? 1 : row === 5 ? 2 : row <= 7 ? 3 : 4;
+        let targetScore = scoreTable[rowIndex][col];
+
+        const redSum = redIndices.reduce((sum, i) => sum + numbers[i], 0);
+        const greenSum = greenIndices.reduce((sum, i) => sum + numbers[i], 0);
+        if (redSum > greenSum) targetScore += 10;
+        else if (redSum < greenSum) targetScore -= 8;
+        else targetScore = 69;
+
+        const circularRun = (predicate, needed) => {
+            for (let start = 0; start < 10; start++) {
+                let ok = true;
+                for (let k = 0; k < needed; k++) {
+                    if (!predicate(numbers[(start + k) % 10])) { ok = false; break; }
+                }
+                if (ok) return true;
+            }
+            return false;
+        };
+
+        // Первая подходящая строка таблицы условий — сверху вниз.
+        let numDarts, constraintLetters, conditionText;
+        if (circularRun(v => v <= 6, 3)) {
+            numDarts = 3; constraintLetters = ['C','G']; conditionText = '≥3 соседних сегмента со значениями 6 или меньше';
+        } else if (circularRun(v => v >= 15, 3)) {
+            numDarts = 4; constraintLetters = ['D','H']; conditionText = '≥3 соседних сегмента со значениями 15 или больше';
+        } else if (circularRun(v => v % 2 !== 0, 4)) {
+            numDarts = 3; constraintLetters = ['A','F']; conditionText = '≥4 соседних нечётных сегмента';
+        } else if (circularRun(v => v % 2 === 0, 3)) {
+            numDarts = 4; constraintLetters = ['B','D']; conditionText = '≥3 соседних чётных сегмента';
+        } else if (/[MVG]/.test(serial)) {
+            numDarts = 4; constraintLetters = ['C','E','I']; conditionText = 'серийный номер содержит M, V или G';
+        } else if (numbers.filter(v => v > 10).length === 5) {
+            numDarts = 3; constraintLetters = ['G','H']; conditionText = 'ровно 5 сегментов имеют значения выше 10';
+        } else if (targetScore <= 45) {
+            numDarts = 2; constraintLetters = []; conditionText = 'нужные очки ≤ 45';
+        } else {
+            numDarts = 3; constraintLetters = ['B','E','I']; conditionText = 'ни одно из предыдущих условий не подошло';
+        }
+
+        const constraints = Object.fromEntries('ABCDEFGHI'.split('').map(x => [x, constraintLetters.includes(x)]));
+        const adjustment = redSum > greenSum ? '+10' : redSum < greenSum ? '−8' : 'сброс до 69';
+        document.getElementById('autoInfo').innerHTML =
+            `<b>Расчёт:</b> AA + цифры серийника = ${aaBatteries} + ${digitCount} = ${row}; ` +
+            `индикаторы + порты = ${indicatorPorts}.<br>` +
+            `<b>Цветовые суммы:</b> красные ${redSum}, зелёные ${greenSum} → ${adjustment}.<br>` +
+            `<b>Нужно очков:</b> ${targetScore}. <b>Дротиков:</b> ${numDarts}. ` +
+            `<b>Ограничения:</b> ${constraintLetters.length ? constraintLetters.join(', ') : 'нет'}.<br>` +
+            `<b>Сработавшее условие:</b> ${conditionText}.`;
+
+        const allThrows = generateAllThrows(numbers);
+        const results = [];
+        const MAX_RESULTS = 5000;
+        const maxScorePerDart = Math.max(...allThrows.map(t => t.pts));
+        const minScorePerDart = Math.min(...allThrows.map(t => t.pts));
+
+        function search(dartsLeft, currentScore, currentSequence, usedRegularIndices) {
+            if (results.length >= MAX_RESULTS) return;
+
+            if (dartsLeft === 0) {
+                if (currentScore === targetScore && isValid(currentSequence, constraints)) {
+                    results.push([...currentSequence]);
+                }
+                return;
+            }
+
+            if (currentScore >= targetScore) return;
+            if (currentScore + dartsLeft * maxScorePerDart < targetScore) return;
+            if (currentScore + dartsLeft * minScorePerDart > targetScore) return;
+
+            for (let t of allThrows) {
+                // Правило руководства: один и тот же номерной сектор нельзя выбирать повторно,
+                // даже если во второй раз используется другой множитель.
+                if (t.index >= 0 && usedRegularIndices.has(t.index)) continue;
+
+                const newScore = currentScore + t.pts;
+                if (newScore > targetScore) continue;
+
+                currentSequence.push(t);
+                if (t.index >= 0) usedRegularIndices.add(t.index);
+
+                search(dartsLeft - 1, newScore, currentSequence, usedRegularIndices);
+
+                if (t.index >= 0) usedRegularIndices.delete(t.index);
+                currentSequence.pop();
+            }
+        }
+
+        search(numDarts, 0, [], new Set());
+
+        if (results.length === 0) {
+            outputDiv.innerHTML = '<div class="no-results">Комбинаций не найдено. Проверьте число очков, число дротиков и выбранные ограничения.</div>';
+            return;
+        }
+
+        const resultHTML = results.map((seq, index) => {
+            const total = seq.reduce((sum, t) => sum + t.pts, 0);
+            const seqStr = seq.map(t => t.name).join(' → ');
+            return `<div class="result-item">#${index + 1}: <span>${seqStr}</span> (Сумма: ${total})</div>`;
+        }).join('');
+
+        const capped = results.length >= MAX_RESULTS
+            ? `Показаны первые ${MAX_RESULTS} комбинаций.`
+            : `Найдено комбинаций: ${results.length}`;
+        outputDiv.innerHTML = `<div style="margin-bottom: 10px; color: #2ecc71;">${capped}</div>` + resultHTML;
+    }
+
+    function isValid(seq, c) {
+        const lastThrow = seq[seq.length - 1];
+
+        // БЕЗУСЛОВНОЕ ПРАВИЛО:
+        // последний бросок должен быть либо в обычную двойную область,
+        // либо в КРАСНОЕ яблочко (50). Зеленое яблочко (25) завершать не может.
+        if (lastThrow.zone !== 'double' && lastThrow.zone !== 'bull50') {
+            return false;
+        }
+
+        // Дополнительная страховка правила о неповторении номерного сектора.
+        const regularIndices = seq.filter(t => t.index >= 0).map(t => t.index);
+        if (new Set(regularIndices).size !== regularIndices.length) return false;
+
+        // A: Нельзя использовать ОДИНАРНЫЕ области нечётных номерных сегментов.
+        // Double/triple нечётного сегмента разрешены; bullseye исключён из этого ограничения.
+        if (c.A) {
+            for (let t of seq) {
+                if (t.zone === 'single' && t.seg % 2 !== 0) return false;
+            }
+        }
+
+        // B: Закончить обычной двойной областью на верхней половине
+        if (c.B) {
+            if (lastThrow.zone !== 'double' || !topHalfIndices.includes(lastThrow.index)) return false;
+        }
+
+        // C: Хотя бы раз использовать обычную двойную область на нижней половине
+        if (c.C) {
+            const hasBottomDouble = seq.some(t => t.zone === 'double' && bottomHalfIndices.includes(t.index));
+            if (!hasBottomDouble) return false;
+        }
+
+        // D: Закончить обычной двойной областью зелёного номерного сегмента
+        if (c.D) {
+            if (lastThrow.zone !== 'double' || !greenIndices.includes(lastThrow.index)) return false;
+        }
+
+        // E: Ровно одно попадание в ОДИНАРНОЕ яблочко (25).
+        // Double bull (50) не засчитывается как требуемый single bullseye.
+        if (c.E) {
+            const singleBulls = seq.filter(t => t.zone === 'bull25').length;
+            if (singleBulls !== 1) return false;
+        }
+
+        // F: Использовать хотя бы одну тройную область
+        if (c.F) {
+            if (!seq.some(t => t.zone === 'triple')) return false;
+        }
+
+        // G: Использовать хотя бы по одной ОБЫЧНОЙ одинарной, двойной и тройной области.
+        // Яблочко 25/50 не считается одинарной/двойной областью кольца.
+        if (c.G) {
+            const hasSingle = seq.some(t => t.zone === 'single');
+            const hasDouble = seq.some(t => t.zone === 'double');
+            const hasTriple = seq.some(t => t.zone === 'triple');
+            if (!hasSingle || !hasDouble || !hasTriple) return false;
+        }
+
+        // H: Хотя бы одна тройная область номерного сегмента с чётным значением
+        if (c.H) {
+            if (!seq.some(t => t.zone === 'triple' && t.seg % 2 === 0)) return false;
+        }
+
+        // I: Каждый дротик должен принести различное количество очков
+        if (c.I) {
+            const points = seq.map(t => t.pts);
+            if (new Set(points).size !== points.length) return false;
+        }
+
+        return true;
+    }
+
+    updateSums();
+</script>
+
+</body>
+</html>
